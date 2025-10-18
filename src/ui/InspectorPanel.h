@@ -3,10 +3,11 @@
 
 #include <vector>
 class Mesh;
+class Scene;
 
 class InspectorPanel {
 public:
-    void render(const std::vector<Mesh*>& meshes);
+    void render(Scene* scene);
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -48,7 +49,27 @@ void ProjectPanel::setProjectPath(const std::string& path) {
     }
 }
 
-void ProjectPanel::ensureDefaultFolders() { /* no-op */ }
+void ProjectPanel::ensureDefaultFolders() {
+    if (initialized_) return;
+    initialized_ = true;
+    if (projectPath_.empty()) return;
+    try {
+        fs::path meshesDir = fs::path(projectPath_) / "Meshes";
+        if (!fs::exists(meshesDir)) fs::create_directories(meshesDir);
+        const char* names[] = {"Circle", "Triangle", "Square"};
+        for (const char* n : names) {
+            fs::path f = meshesDir / (std::string(n) + ".mesh");
+            if (!fs::exists(f)) {
+                std::ofstream ofs(f.string(), std::ios::out | std::ios::trunc);
+                if (ofs) {
+                    ofs << "type: " << n << "\n";
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "ensureDefaultFolders error: " << e.what() << std::endl;
+    }
+}
 
 void ProjectPanel::renderDirectoryTree(const std::string& path, int depth) {
     if (!fs::exists(path) || !fs::is_directory(path)) return;
@@ -83,6 +104,14 @@ void ProjectPanel::renderDirectoryTree(const std::string& path, int depth) {
         } else {
             flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
             ImGui::TreeNodeEx(filename.c_str(), flags);
+            // Enable drag for .mesh files
+            std::string ext = entry.path().extension().string();
+            if (ext == ".mesh" && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                std::string name = entry.path().stem().string();
+                ImGui::SetDragDropPayload("ASSET_MESH", name.c_str(), (name.size() + 1) * sizeof(char));
+                ImGui::TextUnformatted(name.c_str());
+                ImGui::EndDragDropSource();
+            }
         }
     }
 }

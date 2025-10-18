@@ -17,13 +17,12 @@ set(SOURCES
     src/main.cpp
     src/Application.cpp
     src/Scene.cpp
-    src/meshes/TriangleMesh.cpp
-    src/meshes/SquareMesh.cpp
     src/Shader.cpp
     src/Mesh.cpp
     src/ui/InspectorPanel.cpp
     src/ui/ViewportPanel.cpp
     src/ui/ProjectPanel.cpp
+    src/ui/PropertiesPanel.cpp
 
 )
 

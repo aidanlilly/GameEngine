@@ -6,14 +6,16 @@
 
 class Mesh;
 class Shader;
+class Scene;
 
 class ViewportPanel {
 public:
     ViewportPanel();
     ~ViewportPanel();
 
-    // Renders the given meshes into an offscreen texture sized to available content region, then displays it.
-    void render(Shader& shader, const std::vector<Mesh*>& meshes);
+    // Renders the given scene into an offscreen texture sized to available content region, then displays it.
+    // Also accepts drag/drop of mesh assets and click-to-select.
+    void render(Shader& shader, Scene* scene);
 
 private:
     void ensureFBO(int w, int h);

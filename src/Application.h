@@ -8,6 +8,7 @@ class Mesh;
 class InspectorPanel;
 class ViewportPanel;
 class ProjectPanel;
+class PropertiesPanel;
 class Scene;
 
 class Application {
@@ -27,6 +28,7 @@ private:
     InspectorPanel* inspector_ = nullptr;
     ViewportPanel* viewport_ = nullptr;
     ProjectPanel* project_ = nullptr;
+    PropertiesPanel* properties_ = nullptr;
 };
 
 #endif

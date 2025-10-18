@@ -16,6 +16,7 @@
 #include "ui/InspectorPanel.h"
 #include "ui/ViewportPanel.h"
 #include "ui/ProjectPanel.h"
+#include "ui/PropertiesPanel.h"
 #include "Scene.h"
 
 Application::Application() {}
@@ -61,6 +62,7 @@ bool Application::init() {
     inspector_ = new InspectorPanel();
     viewport_ = new ViewportPanel();
     project_ = new ProjectPanel();
+    properties_ = new PropertiesPanel();
     project_->setProjectPath("GameProject");
     return true;
 }
@@ -71,6 +73,7 @@ void Application::shutdown() {
     delete inspector_; inspector_ = nullptr;
     delete viewport_; viewport_ = nullptr;
     delete project_; project_ = nullptr;
+    delete properties_; properties_ = nullptr;
 
     // Shutdown ImGui backends before destroying context
     if (window_) {
@@ -90,6 +93,11 @@ void Application::frame() {
     int winW, winH;
     glfwGetFramebufferSize(window_, &winW, &winH);
 
+    // Handle keyboard input (Delete key)
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+        scene_->deleteSelected();
+    }
+
     // Start ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -103,6 +111,7 @@ void Application::frame() {
     ImGui::Begin("Engine", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
     static float inspectorWidth = 300.0f;
+    static float propertiesWidth = 250.0f;
     static float projectHeight = 200.0f;
     const float splitterSize = 2.0f;
     const float splitterHitSize = 8.0f; // Larger hit area for dragging
@@ -117,7 +126,7 @@ void Application::frame() {
 
     // Top section: Inspector + Viewport
     ImGui::BeginChild("InspectorContainer", ImVec2(inspectorWidth, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    inspector_->render(scene_->getMeshes());
+    inspector_->render(scene_);
     ImGui::EndChild();
 
     ImGui::SameLine(0, 0);
@@ -141,8 +150,33 @@ void Application::frame() {
     
     ImGui::SameLine(0, 0);
 
-    ImGui::BeginChild("ViewportContainer", ImVec2(0, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    viewport_->render(*shader_, scene_->getMeshes());
+    // Viewport (middle, flexible width)
+    float viewportWidth = (float)winW - inspectorWidth - propertiesWidth - splitterHitSize * 3;
+    ImGui::BeginChild("ViewportContainer", ImVec2(viewportWidth, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    viewport_->render(*shader_, scene_);
+    ImGui::EndChild();
+
+    // Properties panel (right side, always visible)
+    ImGui::SameLine(0, 0);
+    // Horizontal splitter for properties
+    ImVec2 propSplitterPos = ImGui::GetCursorScreenPos();
+    float propOffsetX = (splitterHitSize - splitterSize) * 0.5f;
+    ImGui::InvisibleButton("HSplitter2", ImVec2(splitterHitSize, topPanelHeight));
+    if (ImGui::IsItemActive()) {
+        propertiesWidth -= ImGui::GetIO().MouseDelta.x;
+        propertiesWidth = std::max(150.0f, std::min(propertiesWidth, 500.0f));
+    }
+    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+    ImGui::GetWindowDrawList()->AddRectFilled(
+        ImVec2(propSplitterPos.x + propOffsetX, propSplitterPos.y), 
+        ImVec2(propSplitterPos.x + propOffsetX + splitterSize, propSplitterPos.y + topPanelHeight), 
+        IM_COL32(60, 60, 60, 255)
+    );
+    ImGui::SameLine(0, 0);
+    ImGui::BeginChild("PropertiesContainer", ImVec2(propertiesWidth, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    properties_->render(scene_);
     ImGui::EndChild();
 
     // Vertical splitter bar (wider hit area, thin visual)
