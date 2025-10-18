@@ -16,6 +16,9 @@ include_directories(
 set(SOURCES
     src/main.cpp
     src/Application.cpp
+    src/Scene.cpp
+    src/meshes/TriangleMesh.cpp
+    src/meshes/SquareMesh.cpp
     src/Shader.cpp
     src/Mesh.cpp
     src/ui/InspectorPanel.cpp

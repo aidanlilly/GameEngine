@@ -16,6 +16,7 @@
 #include "ui/InspectorPanel.h"
 #include "ui/ViewportPanel.h"
 #include "ui/ProjectPanel.h"
+#include "Scene.h"
 
 Application::Application() {}
 
@@ -54,35 +55,18 @@ bool Application::init() {
     // Create shader
     shader_ = new Shader("../shaders/vertex.glsl", "../shaders//solid/fragment_solid.glsl");
 
-    // Create meshes
-    std::vector<Vertex> triangleVertices = {
-        { 0.0f,  0.5f, 0.0f},
-        {-0.5f, -0.5f, 0.0f},
-        { 0.5f, -0.5f, 0.0f}
-    };
-    meshes_.push_back(new Mesh(triangleVertices));
-
-    float aspect = 800.0f / 600.0f;
-    std::vector<Vertex> squareVertices = {
-        {-0.5f * aspect,  0.5f, 0.0f},
-        {-0.5f * aspect, -0.5f, 0.0f},
-        { 0.5f * aspect, -0.5f, 0.0f},
-        { 0.5f * aspect, -0.5f, 0.0f},
-        { 0.5f * aspect,  0.5f, 0.0f},
-        {-0.5f * aspect,  0.5f, 0.0f}
-    };
-    meshes_.push_back(new Mesh(squareVertices));
+    // Create scene with its meshes
+    scene_ = new Scene();
 
     inspector_ = new InspectorPanel();
     viewport_ = new ViewportPanel();
     project_ = new ProjectPanel();
-    project_->setProjectPath(".");
+    project_->setProjectPath("GameProject");
     return true;
 }
 
 void Application::shutdown() {
-    for (auto* m : meshes_) delete m;
-    meshes_.clear();
+    delete scene_; scene_ = nullptr;
     delete shader_; shader_ = nullptr;
     delete inspector_; inspector_ = nullptr;
     delete viewport_; viewport_ = nullptr;
@@ -133,7 +117,7 @@ void Application::frame() {
 
     // Top section: Inspector + Viewport
     ImGui::BeginChild("InspectorContainer", ImVec2(inspectorWidth, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    inspector_->render(meshes_);
+    inspector_->render(scene_->getMeshes());
     ImGui::EndChild();
 
     ImGui::SameLine(0, 0);
@@ -158,7 +142,7 @@ void Application::frame() {
     ImGui::SameLine(0, 0);
 
     ImGui::BeginChild("ViewportContainer", ImVec2(0, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    viewport_->render(*shader_, meshes_);
+    viewport_->render(*shader_, scene_->getMeshes());
     ImGui::EndChild();
 
     // Vertical splitter bar (wider hit area, thin visual)

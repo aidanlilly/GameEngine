@@ -8,6 +8,7 @@ class Mesh;
 class InspectorPanel;
 class ViewportPanel;
 class ProjectPanel;
+class Scene;
 
 class Application {
 public:
@@ -22,7 +23,7 @@ private:
 
     GLFWwindow* window_ = nullptr;
     Shader* shader_ = nullptr;
-    std::vector<Mesh*> meshes_;
+    Scene* scene_ = nullptr;
     InspectorPanel* inspector_ = nullptr;
     ViewportPanel* viewport_ = nullptr;
     ProjectPanel* project_ = nullptr;

@@ -65,6 +65,10 @@ void ViewportPanel::render(Shader& shader, const std::vector<Mesh*>& meshes) {
     float aspect = (float)texW_ / (float)texH_;
     ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f, proj);
 
+    // Shader expects:
+    // - mat4 uProjection: orthographic projection
+    // - vec2 uOffset: world-space offset for all meshes
+    // - vec4 uColor: drawing color
     shader.use();
     shader.setMat4("uProjection", proj);
     shader.setVec2("uOffset", 0.0f, 0.0f);
