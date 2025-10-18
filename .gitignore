@@ -1,0 +1,32 @@
+# Build artifacts
+/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+*.make
+*.ninja
+*.rsp
+*.log
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.pdb
+*.ilk
+
+# Visual Studio/IDE misc
+*.user
+*.suo
+*.vcxproj*
+.ipch/
+.vs/
+
+# OS-specific
+.DS_Store
+Thumbs.db
