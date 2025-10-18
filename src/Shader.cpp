@@ -1,4 +1,3 @@
-#define GLEW_STATIC
 #include "Shader.h"
 #include <fstream>
 #include <sstream>

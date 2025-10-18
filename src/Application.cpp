@@ -1,6 +1,5 @@
 #include "Application.h"
 
-#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -16,6 +15,7 @@
 
 #include "ui/InspectorPanel.h"
 #include "ui/ViewportPanel.h"
+#include "ui/ProjectPanel.h"
 
 Application::Application() {}
 
@@ -75,6 +75,8 @@ bool Application::init() {
 
     inspector_ = new InspectorPanel();
     viewport_ = new ViewportPanel();
+    project_ = new ProjectPanel();
+    project_->setProjectPath(".");
     return true;
 }
 
@@ -84,10 +86,14 @@ void Application::shutdown() {
     delete shader_; shader_ = nullptr;
     delete inspector_; inspector_ = nullptr;
     delete viewport_; viewport_ = nullptr;
+    delete project_; project_ = nullptr;
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    // Shutdown ImGui backends before destroying context
+    if (window_) {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+    }
 
     if (window_) {
         glfwDestroyWindow(window_);
@@ -105,30 +111,80 @@ void Application::frame() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // Docked window with splitter
+    // Fullscreen window with panels
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2((float)winW, (float)winH));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     ImGui::Begin("Engine", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
     static float inspectorWidth = 300.0f;
+    static float projectHeight = 200.0f;
+    const float splitterSize = 2.0f;
+    const float splitterHitSize = 8.0f; // Larger hit area for dragging
     float minInspector = 150.0f;
-    float maxInspector = (float)winW - 150.0f;
+    float maxInspector = (float)winW - 150.0f - splitterHitSize;
+    float minProject = 100.0f;
+    float maxProject = (float)winH - 150.0f - splitterHitSize;
     inspectorWidth = std::max(minInspector, std::min(inspectorWidth, maxInspector));
+    projectHeight = std::max(minProject, std::min(projectHeight, maxProject));
 
-    ImGui::BeginChild("InspectorContainer", ImVec2(inspectorWidth, (float)winH), true);
+    float topPanelHeight = (float)winH - projectHeight - splitterHitSize;
+
+    // Top section: Inspector + Viewport
+    ImGui::BeginChild("InspectorContainer", ImVec2(inspectorWidth, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     inspector_->render(meshes_);
     ImGui::EndChild();
 
-    ImGui::SameLine();
-    ImGui::InvisibleButton("Splitter", ImVec2(5.0f, (float)winH));
-    if (ImGui::IsItemActive()) inspectorWidth += ImGui::GetIO().MouseDelta.x;
-    ImGui::SameLine();
+    ImGui::SameLine(0, 0);
+    
+    // Horizontal splitter bar (wider hit area, thin visual)
+    ImVec2 splitterPos = ImGui::GetCursorScreenPos();
+    float offsetX = (splitterHitSize - splitterSize) * 0.5f; // Center the visual bar in hit area
+    ImGui::InvisibleButton("HSplitter", ImVec2(splitterHitSize, topPanelHeight));
+    if (ImGui::IsItemActive()) {
+        inspectorWidth += ImGui::GetIO().MouseDelta.x;
+    }
+    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+    // Draw thin gray bar centered in the hit area
+    ImGui::GetWindowDrawList()->AddRectFilled(
+        ImVec2(splitterPos.x + offsetX, splitterPos.y), 
+        ImVec2(splitterPos.x + offsetX + splitterSize, splitterPos.y + topPanelHeight), 
+        IM_COL32(60, 60, 60, 255)
+    );
+    
+    ImGui::SameLine(0, 0);
 
-    ImGui::BeginChild("ViewportContainer", ImVec2(0, (float)winH), true);
+    ImGui::BeginChild("ViewportContainer", ImVec2(0, topPanelHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     viewport_->render(*shader_, meshes_);
     ImGui::EndChild();
 
+    // Vertical splitter bar (wider hit area, thin visual)
+    ImVec2 vSplitterPos = ImGui::GetCursorScreenPos();
+    float offsetY = (splitterHitSize - splitterSize) * 0.5f; // Center the visual bar in hit area
+    ImGui::InvisibleButton("VSplitter", ImVec2((float)winW, splitterHitSize));
+    if (ImGui::IsItemActive()) {
+        projectHeight -= ImGui::GetIO().MouseDelta.y;
+    }
+    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+    }
+    // Draw thin gray bar centered in the hit area
+    ImGui::GetWindowDrawList()->AddRectFilled(
+        ImVec2(vSplitterPos.x, vSplitterPos.y + offsetY), 
+        ImVec2(vSplitterPos.x + (float)winW, vSplitterPos.y + offsetY + splitterSize), 
+        IM_COL32(60, 60, 60, 255)
+    );
+
+    // Bottom section: Project panel
+    ImGui::BeginChild("BottomSection", ImVec2((float)winW, projectHeight), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    project_->render();
+    ImGui::EndChild();
+
     ImGui::End();
+    ImGui::PopStyleVar(2);
 
     // Clear default and render ImGui
     glViewport(0, 0, winW, winH);

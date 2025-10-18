@@ -20,6 +20,7 @@ set(SOURCES
     src/Mesh.cpp
     src/ui/InspectorPanel.cpp
     src/ui/ViewportPanel.cpp
+    src/ui/ProjectPanel.cpp
 
 )
 

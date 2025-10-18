@@ -7,6 +7,7 @@ class Shader;
 class Mesh;
 class InspectorPanel;
 class ViewportPanel;
+class ProjectPanel;
 
 class Application {
 public:
@@ -24,6 +25,7 @@ private:
     std::vector<Mesh*> meshes_;
     InspectorPanel* inspector_ = nullptr;
     ViewportPanel* viewport_ = nullptr;
+    ProjectPanel* project_ = nullptr;
 };
 
 #endif
