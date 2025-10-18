@@ -1,4 +1,4 @@
-# MyGameEngine
+# Game Engine
 
 A minimal OpenGL playground on Windows using CMake, GLFW, and GLEW. Renders simple geometry with GLSL shaders, structured for growth (Shader and Mesh classes).
 
