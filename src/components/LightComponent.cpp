@@ -7,9 +7,9 @@ LightComponent::LightComponent() {
 
 void LightComponent::renderInspectorGUI() {
     // Type selector
-    const char* typeNames[] = { "Point", "Directional", "Spot" };
+    const char* typeNames[] = { "Point", "Directional", "Spot", "Ambient" };
     int currentType = (int)type;
-    if (ImGui::Combo("Type", &currentType, typeNames, 3)) {
+    if (ImGui::Combo("Type", &currentType, typeNames, 4)) {
         type = (Type)currentType;
     }
     

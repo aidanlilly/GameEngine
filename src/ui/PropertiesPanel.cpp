@@ -5,6 +5,7 @@
 #include "components/TransformComponent.h"
 #include "components/MeshRendererComponent.h"
 #include "components/LightComponent.h"
+#include "components/MaterialComponent.h"
 #include "imgui.h"
 
 void PropertiesPanel::render(Scene* scene) {
@@ -103,6 +104,16 @@ void PropertiesPanel::renderAddComponentMenu(GameObject* gameObject) {
             }
         } else {
             ImGui::TextDisabled("Mesh Renderer (already added)");
+        }
+
+        // Material
+        if (!gameObject->hasComponent<MaterialComponent>()) {
+            if (ImGui::Selectable("Material")) {
+                gameObject->addComponent<MaterialComponent>();
+                ImGui::CloseCurrentPopup();
+            }
+        } else {
+            ImGui::TextDisabled("Material (already added)");
         }
 
             // Light

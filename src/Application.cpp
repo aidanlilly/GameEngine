@@ -53,8 +53,8 @@ bool Application::init() {
 
     std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
 
-    // Create shader
-    shader_ = new Shader("../shaders/vertex.glsl", "../shaders//solid/fragment_solid.glsl");
+    // Create shader (lit)
+    shader_ = new Shader("../shaders/vertex.glsl", "../shaders/lit/fragment_lit.glsl");
 
     // Create scene with its meshes
     scene_ = new Scene();

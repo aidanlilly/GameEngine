@@ -21,6 +21,7 @@ set(SOURCES
     src/components/TransformComponent.cpp
     src/components/MeshRendererComponent.cpp
     src/components/LightComponent.cpp
+    src/components/MaterialComponent.cpp
     src/Shader.cpp
     src/Mesh.cpp
     src/Camera.cpp

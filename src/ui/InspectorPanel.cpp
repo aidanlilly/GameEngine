@@ -2,6 +2,7 @@
 #include "../Scene.h"
 #include "GameObject.h"
 #include "components/MeshRendererComponent.h"
+#include "components/LightComponent.h"
 #include "Mesh.h"
 #include "imgui.h"
 #include <cstdio>
@@ -82,6 +83,31 @@ void InspectorPanel::render(Scene* scene) {
     if (ImGui::BeginPopupContextWindow("InspectorContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
         if (ImGui::MenuItem("Create Empty")) {
             scene->addEmptyGameObject("GameObject", 0.0f, 0.0f, 0.0f);
+        }
+        if (ImGui::BeginMenu("Lights")) {
+            if (ImGui::MenuItem("Directional Light")) {
+                auto* go = scene->addEmptyGameObject("Directional Light", 0.0f, 2.0f, 0.0f);
+                auto* light = go->addComponent<LightComponent>();
+                light->type = LightComponent::Type::Directional;
+                light->color[0]=1.0f; light->color[1]=1.0f; light->color[2]=1.0f;
+                light->intensity = 1.0f;
+            }
+            if (ImGui::MenuItem("Point Light")) {
+                auto* go = scene->addEmptyGameObject("Point Light", 0.0f, 2.0f, 0.0f);
+                auto* light = go->addComponent<LightComponent>();
+                light->type = LightComponent::Type::Point;
+                light->color[0]=1.0f; light->color[1]=0.95f; light->color[2]=0.8f;
+                light->intensity = 5.0f;
+                light->range = 10.0f;
+            }
+            if (ImGui::MenuItem("Ambient Light")) {
+                auto* go = scene->addEmptyGameObject("Ambient Light", 0.0f, 2.0f, 0.0f);
+                auto* light = go->addComponent<LightComponent>();
+                light->type = LightComponent::Type::Ambient;
+                light->color[0]=0.2f; light->color[1]=0.2f; light->color[2]=0.25f;
+                light->intensity = 1.0f;
+            }
+            ImGui::EndMenu();
         }
         ImGui::EndPopup();
     }

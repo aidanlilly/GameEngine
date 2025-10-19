@@ -8,6 +8,8 @@
 #include "GameObject.h"
 #include "components/TransformComponent.h"
 #include "components/MeshRendererComponent.h"
+#include "components/MaterialComponent.h"
+#include "components/LightComponent.h"
 #include "imgui.h"
 #include <algorithm>
 #include <iostream>
@@ -125,10 +127,80 @@ void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
     shader.setMat4("uProjection", proj);
     shader.setMat4("uView", view);
 
-    // Render grid as an infinite-looking plane by recentering under the camera target (pan)
-    // Get camera eye and derive target by subtracting orbit vector
+    // Camera position (for lighting)
     float eyeX, eyeY, eyeZ;
     camera_->getEyePosition(eyeX, eyeY, eyeZ);
+
+    // View position
+    shader.setVec3("uViewPos", eyeX, eyeY, eyeZ);
+
+    // Collect lights from scene
+    const int MAX_DIR = 4;
+    const int MAX_POINT = 16;
+    int dirCount = 0, pointCount = 0;
+    float ambient[3] = {0.02f, 0.02f, 0.02f}; // base ambient
+    // Temporary arrays on CPU side
+    struct Vec3 { float x,y,z; };
+    Vec3 dirDirs[MAX_DIR];
+    Vec3 dirColors[MAX_DIR];
+    Vec3 pointPos[MAX_POINT];
+    Vec3 pointColors[MAX_POINT];
+    float pointRange[MAX_POINT];
+
+    auto& objectsForLights = scene->getGameObjects();
+    for (size_t i = 0; i < objectsForLights.size(); ++i) {
+        if (dirCount >= MAX_DIR && pointCount >= MAX_POINT) break;
+        auto* go = objectsForLights[i].get();
+        auto* light = go->getComponent<LightComponent>();
+        if (!light) continue;
+        auto* t = go->getTransform();
+
+        // Color with intensity
+        Vec3 col = { light->color[0] * light->intensity, light->color[1] * light->intensity, light->color[2] * light->intensity };
+
+    if (light->type == LightComponent::Type::Directional && dirCount < MAX_DIR) {
+            // Derive direction from transform rotation (approx yaw/pitch)
+            float yaw = t->rotY * MathUtils::DEG_TO_RAD;
+            float pitch = t->rotX * MathUtils::DEG_TO_RAD;
+            Vec3 dir = { cosf(pitch)*sinf(yaw), -sinf(pitch), -cosf(pitch)*cosf(yaw) };
+            dirDirs[dirCount] = dir;
+            dirColors[dirCount] = col;
+            dirCount++;
+        } else if (light->type == LightComponent::Type::Point && pointCount < MAX_POINT) {
+            pointPos[pointCount] = { t->x, t->y, t->z };
+            pointColors[pointCount] = col;
+            pointRange[pointCount] = light->range;
+            pointCount++;
+        } else if (light->type == LightComponent::Type::Ambient) {
+            ambient[0] += col.x;
+            ambient[1] += col.y;
+            ambient[2] += col.z;
+        }
+    }
+
+    // Upload light uniforms
+    shader.setInt("uDirLightCount", dirCount);
+    for (int i = 0; i < dirCount; ++i) {
+        char name[64];
+        snprintf(name, sizeof(name), "uDirLightDirs[%d]", i);
+        shader.setVec3(name, dirDirs[i].x, dirDirs[i].y, dirDirs[i].z);
+        snprintf(name, sizeof(name), "uDirLightColors[%d]", i);
+        shader.setVec3(name, dirColors[i].x, dirColors[i].y, dirColors[i].z);
+    }
+    shader.setInt("uPointLightCount", pointCount);
+    for (int i = 0; i < pointCount; ++i) {
+        char name[64];
+        snprintf(name, sizeof(name), "uPointLightPos[%d]", i);
+        shader.setVec3(name, pointPos[i].x, pointPos[i].y, pointPos[i].z);
+        snprintf(name, sizeof(name), "uPointLightColors[%d]", i);
+        shader.setVec3(name, pointColors[i].x, pointColors[i].y, pointColors[i].z);
+        snprintf(name, sizeof(name), "uPointLightRange[%d]", i);
+        shader.setFloat(name, pointRange[i]);
+    }
+    shader.setVec3("uAmbientColor", ambient[0], ambient[1], ambient[2]);
+
+    // Render grid as an infinite-looking plane by recentering under the camera target (pan)
+    // Get camera eye and derive target by subtracting orbit vector
     // We approximate the camera target as (panX, panY, panZ) but Camera doesn't expose directly;
     // instead, center the grid on eye projected onto Y=0 and snapped to spacing for stability.
     const float spacing = 1.0f;
@@ -138,6 +210,12 @@ void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
     // Large uniform scale to cover far distances visually
     MathUtils::buildModelMatrix(gx, 0.0f, gz, 0, 0, 0, 1.0f, 1.0f, 1.0f, gridModel);
     shader.setMat4("uModel", gridModel);
+    // Neutral material for grid (avoid mesh colors tinting it)
+    shader.setVec3("uAlbedo", 0.5f, 0.5f, 0.5f);
+    shader.setFloat("uMetallic", 0.0f);
+    shader.setFloat("uRoughness", 1.0f);
+    shader.setVec4("uSelectionTint", 0.0f, 0.0f, 0.0f, 0.0f);
+    shader.setFloat("uAmbientStrength", 0.0f); // no ambient on grid
     grid_->render(shader);
 
     // Render scene objects
@@ -163,11 +241,25 @@ void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
         
         shader.setMat4("uModel", model);
         
-        // Color based on selection
+        // Material uniforms
+        float albedo[3] = {0.8f, 0.5f, 0.2f};
+        float metallic = 0.0f;
+        float roughness = 0.8f;
+        if (auto* mat = go->getComponent<MaterialComponent>()) {
+            albedo[0] = mat->albedo[0]; albedo[1] = mat->albedo[1]; albedo[2] = mat->albedo[2];
+            metallic = mat->metallic;
+            roughness = mat->roughness;
+        }
+    shader.setVec3("uAlbedo", albedo[0], albedo[1], albedo[2]);
+        shader.setFloat("uMetallic", metallic);
+        shader.setFloat("uRoughness", roughness);
+    shader.setFloat("uAmbientStrength", 1.0f);
+
+        // Selection tint
         if (scene->getSelectedIndex() == (int)i) {
-            shader.setVec4("uColor", 1.0f, 1.0f, 0.3f, 1.0f); // Yellow for selected
+            shader.setVec4("uSelectionTint", 0.2f, 0.2f, 0.0f, 0.0f);
         } else {
-            shader.setVec4("uColor", 0.8f, 0.5f, 0.2f, 1.0f); // Orange for normal
+            shader.setVec4("uSelectionTint", 0.0f, 0.0f, 0.0f, 0.0f);
         }
         
             meshRenderer->mesh->draw();

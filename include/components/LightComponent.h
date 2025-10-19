@@ -18,7 +18,7 @@ public:
     float intensity = 1.0f;
     float range = 10.0f;
     
-    enum class Type { Point, Directional, Spot };
+    enum class Type { Point, Directional, Spot, Ambient };
     Type type = Type::Point;
 };
 
