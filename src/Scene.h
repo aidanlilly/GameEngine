@@ -12,6 +12,7 @@ class Scene {
 public:
     Scene();
     ~Scene();
+
     
     std::vector<std::unique_ptr<GameObject>>& getGameObjects() { return gameObjects_; }
     const std::vector<std::unique_ptr<GameObject>>& getGameObjects() const { return gameObjects_; }

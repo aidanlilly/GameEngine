@@ -96,7 +96,7 @@ void InspectorPanel::render(Scene* scene) {
                 auto* go = scene->addEmptyGameObject("Point Light", 0.0f, 2.0f, 0.0f);
                 auto* light = go->addComponent<LightComponent>();
                 light->type = LightComponent::Type::Point;
-                light->color[0]=1.0f; light->color[1]=0.95f; light->color[2]=0.8f;
+                light->color[0]=1.0f; light->color[1]=1.0f; light->color[2]=1.0f;
                 light->intensity = 5.0f;
                 light->range = 10.0f;
             }
@@ -104,7 +104,7 @@ void InspectorPanel::render(Scene* scene) {
                 auto* go = scene->addEmptyGameObject("Ambient Light", 0.0f, 2.0f, 0.0f);
                 auto* light = go->addComponent<LightComponent>();
                 light->type = LightComponent::Type::Ambient;
-                light->color[0]=0.2f; light->color[1]=0.2f; light->color[2]=0.25f;
+                light->color[0]=1.0f; light->color[1]=1.0f; light->color[2]=1.0f;
                 light->intensity = 1.0f;
             }
             ImGui::EndMenu();
