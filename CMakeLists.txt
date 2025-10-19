@@ -19,6 +19,8 @@ set(SOURCES
     src/Scene.cpp
     src/Shader.cpp
     src/Mesh.cpp
+    src/Camera.cpp
+    src/Grid.cpp
     src/ui/InspectorPanel.cpp
     src/ui/ViewportPanel.cpp
     src/ui/ProjectPanel.cpp

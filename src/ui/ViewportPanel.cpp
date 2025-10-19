@@ -1,21 +1,24 @@
 #include "ViewportPanel.h"
 #include "Shader.h"
 #include "Mesh.h"
-#include "glm_perspective.h"
-#include "Meshes.h"
+#include "Camera.h"
+#include "Grid.h"
+#include "MathUtils.h"
 #include "../Scene.h"
 #include "imgui.h"
 #include <algorithm>
 #include <iostream>
 #include <cmath>
+#include <string>
 
-ViewportPanel::ViewportPanel() {
-    createGridMesh();
+ViewportPanel::ViewportPanel() 
+    : camera_(std::make_unique<Camera>())
+    , grid_(std::make_unique<Grid>(20, 1.0f))
+{
 }
 
 ViewportPanel::~ViewportPanel() {
     destroyFBO();
-    destroyGridMesh();
 }
 
 void ViewportPanel::destroyFBO() {
@@ -56,72 +59,235 @@ void ViewportPanel::ensureFBO(int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void ViewportPanel::createGridMesh() {
-    // Create a grid on the XZ plane (Y=0)
-    const int gridSize = 20;
-    const float gridSpacing = 1.0f;
-    std::vector<float> vertices;
+void ViewportPanel::handleCameraControls() {
+    if (!ImGui::IsWindowHovered()) return;
 
-    // Lines parallel to X axis
-    for (int z = -gridSize; z <= gridSize; ++z) {
-        vertices.push_back(-gridSize * gridSpacing);
-        vertices.push_back(0.0f);
-        vertices.push_back(z * gridSpacing);
-        
-        vertices.push_back(gridSize * gridSpacing);
-        vertices.push_back(0.0f);
-        vertices.push_back(z * gridSpacing);
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Mouse drag (any button): rotate/orbit
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
+        ImGui::IsMouseDragging(ImGuiMouseButton_Right) ||
+        ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+        float deltaX = io.MouseDelta.x * 0.005f;
+        float deltaY = io.MouseDelta.y * 0.005f;
+        // Invert horizontal (drag right => look left), keep vertical (drag down => look down)
+        camera_->orbit(-deltaX, deltaY);
     }
 
-    // Lines parallel to Z axis
-    for (int x = -gridSize; x <= gridSize; ++x) {
-        vertices.push_back(x * gridSpacing);
-        vertices.push_back(0.0f);
-        vertices.push_back(-gridSize * gridSpacing);
-        
-        vertices.push_back(x * gridSpacing);
-        vertices.push_back(0.0f);
-        vertices.push_back(gridSize * gridSpacing);
+    // Middle mouse drag additionally allows fine pan if holding Shift
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle) && io.KeyShift) {
+        camera_->pan(io.MouseDelta.x, -io.MouseDelta.y);
     }
 
-    gridVertexCount_ = vertices.size() / 3;
+    // WASD movement while hovered
+    float forward = 0.0f, right = 0.0f, up = 0.0f;
+    if (ImGui::IsKeyDown(ImGuiKey_W)) forward += 1.0f;
+    if (ImGui::IsKeyDown(ImGuiKey_S)) forward -= 1.0f;
+    if (ImGui::IsKeyDown(ImGuiKey_D)) right += 1.0f;
+    if (ImGui::IsKeyDown(ImGuiKey_A)) right -= 1.0f;
+    if (ImGui::IsKeyDown(ImGuiKey_E)) up += 1.0f;   // Elevate
+    if (ImGui::IsKeyDown(ImGuiKey_Q)) up -= 1.0f;   // Lower
+    if (forward != 0.0f || right != 0.0f || up != 0.0f) {
+        // Normalize diagonal speed
+        float len = sqrtf(forward*forward + right*right + up*up);
+        if (len > 0.0f) { forward /= len; right /= len; up /= len; }
+        camera_->moveRelative(forward, right, up);
+    }
 
-    glGenVertexArrays(1, &gridVAO_);
-    glGenBuffers(1, &gridVBO_);
-
-    glBindVertexArray(gridVAO_);
-    glBindBuffer(GL_ARRAY_BUFFER, gridVBO_);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    // Mouse wheel: zoom
+    float wheel = io.MouseWheel;
+    if (wheel != 0.0f) {
+        camera_->zoom(wheel);
+    }
 }
 
-void ViewportPanel::destroyGridMesh() {
-    if (gridVAO_) glDeleteVertexArrays(1, &gridVAO_);
-    if (gridVBO_) glDeleteBuffers(1, &gridVBO_);
-    gridVAO_ = 0;
-    gridVBO_ = 0;
-    gridVertexCount_ = 0;
-}
-
-void ViewportPanel::renderGrid(Shader& shader) {
-    // Render grid as lines
-    float identity[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
-    shader.setMat4("uModel", identity);
-    shader.setVec4("uColor", 0.3f, 0.3f, 0.3f, 1.0f); // Gray grid
+void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
+    // Get camera matrices
+    float view[16];
+    float proj[16];
+    float aspect = (float)texW_ / (float)texH_;
     
-    glBindVertexArray(gridVAO_);
-    glDrawArrays(GL_LINES, 0, gridVertexCount_);
-    glBindVertexArray(0);
+    camera_->getViewMatrix(view);
+    camera_->getProjectionMatrix(proj, aspect);
+    
+    // Set up rendering state
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glViewport(0, 0, texW_, texH_);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    shader.use();
+    shader.setMat4("uProjection", proj);
+    shader.setMat4("uView", view);
+
+    // Render grid as an infinite-looking plane by recentering under the camera target (pan)
+    // Get camera eye and derive target by subtracting orbit vector
+    float eyeX, eyeY, eyeZ;
+    camera_->getEyePosition(eyeX, eyeY, eyeZ);
+    // We approximate the camera target as (panX, panY, panZ) but Camera doesn't expose directly;
+    // instead, center the grid on eye projected onto Y=0 and snapped to spacing for stability.
+    const float spacing = 1.0f;
+    float gx = floorf(eyeX / spacing) * spacing;
+    float gz = floorf(eyeZ / spacing) * spacing;
+    float gridModel[16];
+    // Large uniform scale to cover far distances visually
+    MathUtils::buildModelMatrix(gx, 0.0f, gz, 0, 0, 0, 1.0f, 1.0f, 1.0f, gridModel);
+    shader.setMat4("uModel", gridModel);
+    grid_->render(shader);
+
+    // Render scene objects
+    auto& instances = scene->getInstances();
+    for (size_t i = 0; i < instances.size(); ++i) {
+        const auto& inst = instances[i];
+        
+        // Build model matrix from transform
+        float model[16];
+        MathUtils::buildModelMatrix(
+            inst.transform.x, inst.transform.y, inst.transform.z,
+            inst.transform.rotX * MathUtils::DEG_TO_RAD,
+            inst.transform.rotY * MathUtils::DEG_TO_RAD,
+            inst.transform.rotZ * MathUtils::DEG_TO_RAD,
+            inst.transform.scaleX, inst.transform.scaleY, inst.transform.scaleZ,
+            model
+        );
+        
+        shader.setMat4("uModel", model);
+        
+        // Color based on selection
+        if (scene->getSelectedIndex() == (int)i) {
+            shader.setVec4("uColor", 1.0f, 1.0f, 0.3f, 1.0f); // Yellow for selected
+        } else {
+            shader.setVec4("uColor", 0.8f, 0.5f, 0.2f, 1.0f); // Orange for normal
+        }
+        
+        inst.mesh->draw();
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void ViewportPanel::handleSelection(Scene* scene, bool isImageHovered) {
+    if (!isImageHovered) return;
+
+    printf("[Selection] Click detected on viewport image\n");
+
+    // Get mouse position relative to the viewport image
+    ImVec2 mousePos = ImGui::GetMousePos();
+    ImVec2 imageMin = ImGui::GetItemRectMin();
+    ImVec2 imageMax = ImGui::GetItemRectMax();
+
+    // Convert to normalized device coordinates [-1, 1]
+    float ndcX = ((mousePos.x - imageMin.x) / (imageMax.x - imageMin.x)) * 2.0f - 1.0f;
+    float ndcY = 1.0f - ((mousePos.y - imageMin.y) / (imageMax.y - imageMin.y)) * 2.0f;
+
+    // Get camera matrices
+    float view[16], proj[16];
+    float aspect = (float)texW_ / (float)texH_;
+    camera_->getViewMatrix(view);
+    camera_->getProjectionMatrix(proj, aspect);
+
+    // Ray origin: camera position
+    float rayOriginX, rayOriginY, rayOriginZ;
+    camera_->getEyePosition(rayOriginX, rayOriginY, rayOriginZ);
+    printf("[Selection] Ray origin: %f %f %f\n", rayOriginX, rayOriginY, rayOriginZ);
+
+    // Ray direction: unproject NDC to world
+    // We'll use a simple approach: project NDC to near plane, then transform by inverse view
+    float near = 0.1f;
+    float rayClip[4] = { ndcX, ndcY, -1.0f, 1.0f };
+    float invProj[16], invView[16];
+    MathUtils::invertMatrix(proj, invProj);
+    MathUtils::invertMatrix(view, invView);
+    float rayEye[4];
+    for (int i = 0; i < 4; ++i) {
+        rayEye[i] = invProj[i*4+0] * rayClip[0] + invProj[i*4+1] * rayClip[1] +
+                    invProj[i*4+2] * rayClip[2] + invProj[i*4+3] * rayClip[3];
+    }
+    rayEye[2] = -1.0f; rayEye[3] = 0.0f;
+    float rayWorld[4];
+    for (int i = 0; i < 4; ++i) {
+        rayWorld[i] = invView[i*4+0] * rayEye[0] + invView[i*4+1] * rayEye[1] +
+                      invView[i*4+2] * rayEye[2] + invView[i*4+3] * rayEye[3];
+    }
+    float rayDirX = rayWorld[0];
+    float rayDirY = rayWorld[1];
+    float rayDirZ = rayWorld[2];
+    float rayLen = sqrtf(rayDirX*rayDirX + rayDirY*rayDirY + rayDirZ*rayDirZ);
+    rayDirX /= rayLen; rayDirY /= rayLen; rayDirZ /= rayLen;
+    printf("[Selection] Ray dir: %f %f %f\n", rayDirX, rayDirY, rayDirZ);
+
+    // Ray-triangle intersection for each mesh
+    auto& instances = scene->getInstances();
+    int closestIndex = -1;
+    float closestDist = 1e30f;
+    for (size_t i = 0; i < instances.size(); ++i) {
+        const auto& inst = instances[i];
+        const auto& verts = inst.mesh->getVertices();
+        float model[16];
+        MathUtils::buildModelMatrix(
+            inst.transform.x, inst.transform.y, inst.transform.z,
+            inst.transform.rotX * MathUtils::DEG_TO_RAD,
+            inst.transform.rotY * MathUtils::DEG_TO_RAD,
+            inst.transform.rotZ * MathUtils::DEG_TO_RAD,
+            inst.transform.scaleX, inst.transform.scaleY, inst.transform.scaleZ,
+            model
+        );
+        // Test all triangles
+        for (size_t j = 0; j + 2 < verts.size(); j += 3) {
+            // Transform vertices to world space
+            float v0x = model[0]*verts[j].x + model[4]*verts[j].y + model[8]*verts[j].z + model[12];
+            float v0y = model[1]*verts[j].x + model[5]*verts[j].y + model[9]*verts[j].z + model[13];
+            float v0z = model[2]*verts[j].x + model[6]*verts[j].y + model[10]*verts[j].z + model[14];
+            float v1x = model[0]*verts[j+1].x + model[4]*verts[j+1].y + model[8]*verts[j+1].z + model[12];
+            float v1y = model[1]*verts[j+1].x + model[5]*verts[j+1].y + model[9]*verts[j+1].z + model[13];
+            float v1z = model[2]*verts[j+1].x + model[6]*verts[j+1].y + model[10]*verts[j+1].z + model[14];
+            float v2x = model[0]*verts[j+2].x + model[4]*verts[j+2].y + model[8]*verts[j+2].z + model[12];
+            float v2y = model[1]*verts[j+2].x + model[5]*verts[j+2].y + model[9]*verts[j+2].z + model[13];
+            float v2z = model[2]*verts[j+2].x + model[6]*verts[j+2].y + model[10]*verts[j+2].z + model[14];
+            float t = 0.0f;
+            if (MathUtils::rayTriangleIntersect(
+                rayOriginX, rayOriginY, rayOriginZ,
+                rayDirX, rayDirY, rayDirZ,
+                v0x, v0y, v0z,
+                v1x, v1y, v1z,
+                v2x, v2y, v2z,
+                t)) {
+                printf("[Selection] Hit triangle: mesh %zu tri %zu t=%f\n", i, j/3, t);
+                if (t < closestDist && t > 0.0f) {
+                    closestDist = t;
+                    closestIndex = (int)i;
+                }
+            }
+        }
+    }
+    printf("[Selection] Closest index: %d\n", closestIndex);
+    if (closestIndex == -1) {
+        printf("[Selection] Unselecting all objects\n");
+    }
+    scene->setSelectedIndex(closestIndex);
+}
+
+void ViewportPanel::handleDragDrop(Scene* scene) {
+    if (!ImGui::BeginDragDropTarget()) return;
+    
+    const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MESH");
+    if (payload && payload->Data) {
+        std::string meshName((const char*)payload->Data);
+        
+        // Spawn at origin, slightly above ground plane
+        // TODO: Implement ray-plane intersection for proper 3D placement
+        if (meshName == "Sphere") {
+            scene->addSphere(1.0f, 48, 0.0f, 1.0f, 0.0f, "Sphere");
+        } else if (meshName == "Pyramid") {
+            scene->addPyramid(1.0f, 0.0f, 1.0f, 0.0f, "Pyramid");
+        } else if (meshName == "Cube") {
+            scene->addCube(1.0f, 0.0f, 1.0f, 0.0f, "Cube");
+        }
+    }
+    
+    ImGui::EndDragDropTarget();
 }
 
 void ViewportPanel::render(Shader& shader, Scene* scene) {
@@ -137,172 +303,24 @@ void ViewportPanel::render(Shader& shader, Scene* scene) {
     int h = std::max(1, (int)avail.y);
     ensureFBO(w, h);
 
-    // Camera controls
-    bool isHovered = ImGui::IsWindowHovered();
-    if (isHovered) {
-        // Left mouse button: orbit camera
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-            camYaw_ += ImGui::GetIO().MouseDelta.x * 0.005f;
-            camPitch_ -= ImGui::GetIO().MouseDelta.y * 0.005f;
-            // Clamp pitch to avoid gimbal lock
-            camPitch_ = std::max(-1.5f, std::min(1.5f, camPitch_));
-        }
-        
-        // Right mouse button: pan camera
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
-            float panSpeed = 0.01f * camDistance_;
-            camPanX_ += ImGui::GetIO().MouseDelta.x * panSpeed;
-            camPanY_ -= ImGui::GetIO().MouseDelta.y * panSpeed;
-        }
-        
-        // Mouse wheel: zoom
-        float wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0.0f) {
-            camDistance_ -= wheel * 0.5f;
-            camDistance_ = std::max(1.0f, std::min(50.0f, camDistance_));
-        }
-    }
+    // Handle camera input
+    handleCameraControls();
 
-    // Calculate camera position (orbit around origin with pan offset)
-    float cx = camDistance_ * cosf(camPitch_) * sinf(camYaw_);
-    float cy = camDistance_ * sinf(camPitch_);
-    float cz = camDistance_ * cosf(camPitch_) * cosf(camYaw_);
-    
-    float targetX = camPanX_;
-    float targetY = camPanY_;
-    float targetZ = 0.0f;
-    
-    float eyeX = cx + targetX;
-    float eyeY = cy + targetY;
-    float eyeZ = cz + targetZ;
-
-    // Build view matrix (lookAt)
-    float fx = targetX - eyeX;
-    float fy = targetY - eyeY;
-    float fz = targetZ - eyeZ;
-    float flen = sqrtf(fx*fx + fy*fy + fz*fz);
-    fx /= flen; fy /= flen; fz /= flen;
-    
-    float upX = 0.0f, upY = 1.0f, upZ = 0.0f;
-    
-    // Right = forward × up
-    float sx = fy * upZ - fz * upY;
-    float sy = fz * upX - fx * upZ;
-    float sz = fx * upY - fy * upX;
-    float slen = sqrtf(sx*sx + sy*sy + sz*sz);
-    sx /= slen; sy /= slen; sz /= slen;
-    
-    // Up = right × forward
-    float ux = sy * fz - sz * fy;
-    float uy = sz * fx - sx * fz;
-    float uz = sx * fy - sy * fx;
-    
-    float view[16] = {
-        sx, ux, -fx, 0,
-        sy, uy, -fy, 0,
-        sz, uz, -fz, 0,
-        -(sx*eyeX + sy*eyeY + sz*eyeZ),
-        -(ux*eyeX + uy*eyeY + uz*eyeZ),
-        -(-fx*eyeX + -fy*eyeY + -fz*eyeZ),
-        1
-    };
-
-    // Build projection matrix
-    float aspect = (float)texW_ / (float)texH_;
-    float proj[16];
-    perspective(45.0f * 3.14159265f / 180.0f, aspect, 0.1f, 1000.0f, proj);
-
-    // Render to FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    glViewport(0, 0, texW_, texH_);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    shader.use();
-    shader.setMat4("uProjection", proj);
-    shader.setMat4("uView", view);
-
-    // Render grid
-    renderGrid(shader);
-
-    // Render scene objects
-    auto& instances = scene->getInstances();
-    for (size_t i = 0; i < instances.size(); ++i) {
-        const auto& inst = instances[i];
-        
-        // Build model matrix from transform
-        float tx = inst.transform.x;
-        float ty = inst.transform.y;
-        float tz = inst.transform.z;
-        float sx = inst.transform.scaleX;
-        float sy = inst.transform.scaleY;
-        float sz = inst.transform.scaleZ;
-        float rx = inst.transform.rotX * 0.0174532925f; // deg to rad
-        float ry = inst.transform.rotY * 0.0174532925f;
-        float rz = inst.transform.rotZ * 0.0174532925f;
-        
-        // Rotation matrices (ZYX order)
-        float cosx = cosf(rx), sinx = sinf(rx);
-        float cosy = cosf(ry), siny = sinf(ry);
-        float cosz = cosf(rz), sinz = sinf(rz);
-        
-        float model[16] = {
-            cosy*cosz*sx, (sinx*siny*cosz - cosx*sinz)*sx, (cosx*siny*cosz + sinx*sinz)*sx, 0,
-            cosy*sinz*sy, (sinx*siny*sinz + cosx*cosz)*sy, (cosx*siny*sinz - sinx*cosz)*sy, 0,
-            -siny*sz, sinx*cosy*sz, cosx*cosy*sz, 0,
-            tx, ty, tz, 1
-        };
-        
-        shader.setMat4("uModel", model);
-        
-        // Color based on selection
-        if (scene->getSelectedIndex() == (int)i) {
-            shader.setVec4("uColor", 1.0f, 1.0f, 0.3f, 1.0f); // Yellow for selected
-        } else {
-            shader.setVec4("uColor", 0.8f, 0.5f, 0.2f, 1.0f); // Orange for normal
-        }
-        
-        inst.mesh->draw();
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // Render the scene to FBO
+    renderScene(shader, scene);
 
     // Display the rendered texture
     ImVec2 imgSize = ImVec2((float)texW_, (float)texH_);
-    ImVec2 imgPos = ImGui::GetCursorScreenPos();
     ImGui::Image((ImTextureID)(intptr_t)colorTex_, imgSize, ImVec2(0, 1), ImVec2(1, 0));
 
-    // Handle object selection (simple ray-based picking would be better, but for now use screen-space distance)
-    if (ImGui::IsItemClicked() && isHovered) {
-        // For now, just cycle through selection or implement proper 3D picking later
-        int currentSelection = scene->getSelectedIndex();
-        if (currentSelection >= 0 && currentSelection < (int)instances.size() - 1) {
-            scene->setSelectedIndex(currentSelection + 1);
-        } else {
-            scene->setSelectedIndex(0);
-        }
+    // Handle object selection (use image item, not window)
+    bool isImageHovered = ImGui::IsItemHovered();
+    if (ImGui::IsItemClicked()) {
+        handleSelection(scene, isImageHovered);
     }
 
     // Handle drag-drop for spawning objects
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MESH")) {
-            const char* name = (const char*)payload->Data;
-            if (name) {
-                std::string meshName(name);
-                // Spawn at origin for now (proper 3D placement would need ray-plane intersection)
-                if (meshName == "Circle") {
-                    scene->addCircle(1.0f, 48, 0.0f, 1.0f, 0.0f);
-                } else if (meshName == "Triangle") {
-                    scene->addTriangle(1.0f, 0.0f, 1.0f, 0.0f);
-                } else if (meshName == "Square") {
-                    scene->addSquare(1.0f, 0.0f, 1.0f, 0.0f);
-                }
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
+    handleDragDrop(scene);
 
     ImGui::EndChild();
 }

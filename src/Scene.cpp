@@ -1,10 +1,10 @@
 #include "Scene.h"
 #include "Mesh.h"
 #include "Meshes.h"
+#include <algorithm>
 
 Scene::Scene() {
-    addTriangle(2.0f, -1.0f, 0.0f, 0.0f);
-    addSquare(2.0f, 1.0f, 0.0f, 0.0f);
+    // Start with empty scene
 }
 
 Scene::~Scene() {
@@ -27,9 +27,45 @@ void Scene::deleteSelected() {
     }
 }
 
-void Scene::addTriangle(float size, float x, float y, float z) {
+std::string Scene::generateUniqueName(const std::string& baseName) {
+    // Check if base name exists
+    bool exists = false;
+    for (const auto& inst : instances_) {
+        if (inst.name == baseName) {
+            exists = true;
+            break;
+        }
+    }
+    
+    if (!exists) return baseName;
+    
+    // Find highest number suffix
+    int maxNum = 0;
+    for (const auto& inst : instances_) {
+        // Check if name starts with baseName
+        if (inst.name.find(baseName) == 0) {
+            // Look for " (#)" pattern
+            size_t parenPos = inst.name.find(" (");
+            if (parenPos != std::string::npos) {
+                size_t closePos = inst.name.find(")", parenPos);
+                if (closePos != std::string::npos) {
+                    std::string numStr = inst.name.substr(parenPos + 2, closePos - parenPos - 2);
+                    try {
+                        int num = std::stoi(numStr);
+                        maxNum = std::max(maxNum, num);
+                    } catch (...) {}
+                }
+            }
+        }
+    }
+    
+    return baseName + " (" + std::to_string(maxNum + 1) + ")";
+}
+
+void Scene::addPyramid(float size, float x, float y, float z, const std::string& baseName) {
     MeshInstance inst;
-    inst.mesh = CreateTriangleMesh(size);
+    inst.mesh = CreatePyramidMesh(size);
+    inst.name = generateUniqueName(baseName);
     inst.transform.x = x;
     inst.transform.y = y;
     inst.transform.z = z;
@@ -37,9 +73,10 @@ void Scene::addTriangle(float size, float x, float y, float z) {
     instances_.push_back(inst);
 }
 
-void Scene::addSquare(float size, float x, float y, float z) {
+void Scene::addCube(float size, float x, float y, float z, const std::string& baseName) {
     MeshInstance inst;
-    inst.mesh = CreateSquareMesh(size);
+    inst.mesh = CreateCubeMesh(size);
+    inst.name = generateUniqueName(baseName);
     inst.transform.x = x;
     inst.transform.y = y;
     inst.transform.z = z;
@@ -47,9 +84,10 @@ void Scene::addSquare(float size, float x, float y, float z) {
     instances_.push_back(inst);
 }
 
-void Scene::addCircle(float diameter, int segments, float x, float y, float z) {
+void Scene::addSphere(float diameter, int segments, float x, float y, float z, const std::string& baseName) {
     MeshInstance inst;
-    inst.mesh = CreateCircleMesh(diameter, segments);
+    inst.mesh = CreateSphereMesh(diameter, segments);
+    inst.name = generateUniqueName(baseName);
     inst.transform.x = x;
     inst.transform.y = y;
     inst.transform.z = z;

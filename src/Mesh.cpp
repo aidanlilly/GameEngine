@@ -2,7 +2,8 @@
 #include "Mesh.h"
 
 Mesh::Mesh(const std::vector<Vertex>& vertices) 
-    : vertexCount(vertices.size()) {
+    : vertexCount(vertices.size())
+    , vertices_(vertices) {
     setupMesh(vertices);
 }
 

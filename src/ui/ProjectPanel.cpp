@@ -56,7 +56,7 @@ void ProjectPanel::ensureDefaultFolders() {
     try {
         fs::path meshesDir = fs::path(projectPath_) / "Meshes";
         if (!fs::exists(meshesDir)) fs::create_directories(meshesDir);
-        const char* names[] = {"Circle", "Triangle", "Square"};
+        const char* names[] = {"Sphere", "Pyramid", "Cube"};
         for (const char* n : names) {
             fs::path f = meshesDir / (std::string(n) + ".mesh");
             if (!fs::exists(f)) {

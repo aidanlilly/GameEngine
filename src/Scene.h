@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <utility>
+#include <string>
 class Mesh;
 
 struct Transform {
@@ -14,6 +15,7 @@ struct Transform {
 struct MeshInstance {
     Mesh* mesh = nullptr;
     Transform transform;
+    std::string name = "Object";
 };
 
 class Scene {
@@ -30,12 +32,16 @@ public:
     void deleteSelected();
     
     // Helpers for clarity
-    void addTriangle(float size = 1.0f, float x = 0.0f, float y = 0.0f, float z = -2.0f);
-    void addSquare(float size = 1.0f, float x = 0.0f, float y = 0.0f, float z = -2.0f);
-    void addCircle(float diameter = 1.0f, int segments = 32, float x = 0.0f, float y = 0.0f, float z = -2.0f);
+    void addPyramid(float size = 1.0f, float x = 0.0f, float y = 0.0f, float z = -2.0f, const std::string& baseName = "Pyramid");
+    void addCube(float size = 1.0f, float x = 0.0f, float y = 0.0f, float z = -2.0f, const std::string& baseName = "Cube");
+    void addSphere(float diameter = 1.0f, int segments = 32, float x = 0.0f, float y = 0.0f, float z = -2.0f, const std::string& baseName = "Sphere");
+    
 private:
     std::vector<MeshInstance> instances_;
     int selectedIndex_ = -1;
+    
+    // Generate unique name with numbering if duplicates exist
+    std::string generateUniqueName(const std::string& baseName);
 };
 
 #endif

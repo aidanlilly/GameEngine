@@ -2,11 +2,12 @@
 #define VIEWPORT_PANEL_H
 
 #include <GL/glew.h>
-#include <vector>
+#include <memory>
 
-class Mesh;
 class Shader;
 class Scene;
+class Camera;
+class Grid;
 
 class ViewportPanel {
 public:
@@ -14,31 +15,27 @@ public:
     ~ViewportPanel();
 
     void render(Shader& shader, Scene* scene);
+    
+    Camera& getCamera() { return *camera_; }
 
 private:
     void ensureFBO(int w, int h);
     void destroyFBO();
-    void createGridMesh();
-    void destroyGridMesh();
-    void renderGrid(Shader& shader);
+    void handleCameraControls();
+    void renderScene(Shader& shader, Scene* scene);
+    void handleSelection(Scene* scene, bool isHovered);
+    void handleDragDrop(Scene* scene);
 
+    // Framebuffer for offscreen rendering
     GLuint fbo_ = 0;
     GLuint colorTex_ = 0;
     GLuint depthRbo_ = 0;
     int texW_ = 0;
     int texH_ = 0;
 
-    // Grid mesh
-    GLuint gridVAO_ = 0;
-    GLuint gridVBO_ = 0;
-    int gridVertexCount_ = 0;
-
-    // 3D Camera
-    float camDistance_ = 10.0f;
-    float camYaw_ = 0.0f;
-    float camPitch_ = 0.3f;
-    float camPanX_ = 0.0f;
-    float camPanY_ = 0.0f;
+    // Scene components
+    std::unique_ptr<Camera> camera_;
+    std::unique_ptr<Grid> grid_;
 };
 
 #endif

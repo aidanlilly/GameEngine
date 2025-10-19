@@ -7,7 +7,7 @@
 
 
 // 3D pyramid (triangle base)
-inline Mesh* CreateTriangleMesh(float size = 1.0f) {
+inline Mesh* CreatePyramidMesh(float size = 1.0f) {
     float s = size * 0.5f;
     std::vector<Vertex> verts = {
         // Base triangle (XY plane)
@@ -32,7 +32,7 @@ inline Mesh* CreateTriangleMesh(float size = 1.0f) {
 
 
 // 3D cube
-inline Mesh* CreateSquareMesh(float size = 1.0f) {
+inline Mesh* CreateCubeMesh(float size = 1.0f) {
     float s = size * 0.5f;
     std::vector<Vertex> verts = {
         // Front face
@@ -59,7 +59,7 @@ inline Mesh* CreateSquareMesh(float size = 1.0f) {
 
 
 // 3D UV sphere (approximate)
-inline Mesh* CreateCircleMesh(float diameter = 1.0f, int segments = 16) {
+inline Mesh* CreateSphereMesh(float diameter = 1.0f, int segments = 16) {
     float r = diameter * 0.5f;
     int rings = segments / 2;
     std::vector<Vertex> verts;
