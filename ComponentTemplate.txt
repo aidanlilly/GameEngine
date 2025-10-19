@@ -1,0 +1,110 @@
+// TEMPLATE FOR CREATING NEW COMPONENTS
+// Copy this file and replace "Template" with your component name
+
+// ============================================
+// HEADER FILE (include/TemplateComponent.h)
+// ============================================
+/*
+#ifndef TEMPLATE_COMPONENT_H
+#define TEMPLATE_COMPONENT_H
+
+#include "Component.h"
+
+class TemplateComponent : public Component {
+public:
+    TemplateComponent();
+    
+    std::string getTypeName() const override { return "Template"; }
+    void renderInspectorGUI() override;
+    bool canBeRemoved() const override { return true; }
+    
+    // Add your component properties here
+    // Example:
+    // float velocity = 0.0f;
+    // bool enabled = true;
+    // int health = 100;
+};
+
+#endif
+*/
+
+// ============================================
+// SOURCE FILE (src/TemplateComponent.cpp)
+// ============================================
+/*
+#include "TemplateComponent.h"
+#include "imgui.h"
+
+TemplateComponent::TemplateComponent() {
+    // Initialize default values here if needed
+}
+
+void TemplateComponent::renderInspectorGUI() {
+    // Use ImGui widgets to display and edit properties
+    // Common ImGui widgets:
+    
+    // Float input
+    // ImGui::DragFloat("Label", &floatVariable, 0.01f, minValue, maxValue);
+    
+    // Integer input
+    // ImGui::DragInt("Label", &intVariable, 1.0f, minValue, maxValue);
+    
+    // Boolean checkbox
+    // ImGui::Checkbox("Label", &boolVariable);
+    
+    // Color picker
+    // ImGui::ColorEdit3("Color", colorArray);
+    
+    // Dropdown combo
+    // const char* items[] = { "Option1", "Option2", "Option3" };
+    // ImGui::Combo("Label", &selectedIndex, items, 3);
+    
+    // Slider
+    // ImGui::SliderFloat("Label", &floatVariable, minValue, maxValue);
+    
+    // Text display
+    // ImGui::Text("Some text: %d", intVariable);
+    
+    // Button
+    // if (ImGui::Button("Click Me")) {
+    //     // Do something
+    // }
+}
+*/
+
+// ============================================
+// STEPS TO ADD YOUR COMPONENT:
+// ============================================
+
+// 1. Create header file in include/ folder
+// 2. Create source file in src/ folder
+// 3. Add source file to CMakeLists.txt in the SOURCES section
+// 4. Add to PropertiesPanel.cpp:
+//    a) Add #include "YourComponent.h" at the top
+//    b) Add entry in renderAddComponentMenu() function:
+/*
+        // Your Component Name
+        if (!gameObject->hasComponent<YourComponent>()) {
+            if (ImGui::Selectable("Your Component Name")) {
+                gameObject->addComponent<YourComponent>();
+                ImGui::CloseCurrentPopup();
+            }
+        } else {
+            ImGui::TextDisabled("Your Component Name (already added)");
+        }
+*/
+
+// 5. Rebuild project using CMake
+
+// ============================================
+// EXAMPLE COMPONENT IDEAS:
+// ============================================
+// - RigidbodyComponent: physics properties (mass, drag, gravity)
+// - AudioSourceComponent: sound playback
+// - ScriptComponent: custom behavior scripts
+// - ColliderComponent: collision detection
+// - ParticleSystemComponent: particle effects
+// - CameraComponent: camera settings
+// - AnimatorComponent: animation control
+// - TagComponent: organizational tags
+// - UIElementComponent: UI rendering

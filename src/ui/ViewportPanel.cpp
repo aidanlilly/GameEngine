@@ -5,6 +5,9 @@
 #include "Grid.h"
 #include "MathUtils.h"
 #include "../Scene.h"
+#include "GameObject.h"
+#include "components/TransformComponent.h"
+#include "components/MeshRendererComponent.h"
 #include "imgui.h"
 #include <algorithm>
 #include <iostream>
@@ -138,18 +141,23 @@ void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
     grid_->render(shader);
 
     // Render scene objects
-    auto& instances = scene->getInstances();
-    for (size_t i = 0; i < instances.size(); ++i) {
-        const auto& inst = instances[i];
+        auto& gameObjects = scene->getGameObjects();
+        for (size_t i = 0; i < gameObjects.size(); ++i) {
+            auto* go = gameObjects[i].get();
+            auto* transform = go->getTransform();
+            auto* meshRenderer = go->getComponent<MeshRendererComponent>();
+        
+            // Skip if no mesh renderer or no mesh
+            if (!meshRenderer || !meshRenderer->mesh) continue;
         
         // Build model matrix from transform
         float model[16];
         MathUtils::buildModelMatrix(
-            inst.transform.x, inst.transform.y, inst.transform.z,
-            inst.transform.rotX * MathUtils::DEG_TO_RAD,
-            inst.transform.rotY * MathUtils::DEG_TO_RAD,
-            inst.transform.rotZ * MathUtils::DEG_TO_RAD,
-            inst.transform.scaleX, inst.transform.scaleY, inst.transform.scaleZ,
+                transform->x, transform->y, transform->z,
+                transform->rotX * MathUtils::DEG_TO_RAD,
+                transform->rotY * MathUtils::DEG_TO_RAD,
+                transform->rotZ * MathUtils::DEG_TO_RAD,
+                transform->scaleX, transform->scaleY, transform->scaleZ,
             model
         );
         
@@ -162,7 +170,7 @@ void ViewportPanel::renderScene(Shader& shader, Scene* scene) {
             shader.setVec4("uColor", 0.8f, 0.5f, 0.2f, 1.0f); // Orange for normal
         }
         
-        inst.mesh->draw();
+            meshRenderer->mesh->draw();
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -219,19 +227,25 @@ void ViewportPanel::handleSelection(Scene* scene, bool isImageHovered) {
     printf("[Selection] Ray dir: %f %f %f\n", rayDirX, rayDirY, rayDirZ);
 
     // Ray-triangle intersection for each mesh
-    auto& instances = scene->getInstances();
+        auto& gameObjects = scene->getGameObjects();
     int closestIndex = -1;
     float closestDist = 1e30f;
-    for (size_t i = 0; i < instances.size(); ++i) {
-        const auto& inst = instances[i];
-        const auto& verts = inst.mesh->getVertices();
+        for (size_t i = 0; i < gameObjects.size(); ++i) {
+            auto* go = gameObjects[i].get();
+            auto* transform = go->getTransform();
+            auto* meshRenderer = go->getComponent<MeshRendererComponent>();
+        
+            // Skip if no mesh renderer or no mesh
+            if (!meshRenderer || !meshRenderer->mesh) continue;
+        
+            const auto& verts = meshRenderer->mesh->getVertices();
         float model[16];
         MathUtils::buildModelMatrix(
-            inst.transform.x, inst.transform.y, inst.transform.z,
-            inst.transform.rotX * MathUtils::DEG_TO_RAD,
-            inst.transform.rotY * MathUtils::DEG_TO_RAD,
-            inst.transform.rotZ * MathUtils::DEG_TO_RAD,
-            inst.transform.scaleX, inst.transform.scaleY, inst.transform.scaleZ,
+                transform->x, transform->y, transform->z,
+                transform->rotX * MathUtils::DEG_TO_RAD,
+                transform->rotY * MathUtils::DEG_TO_RAD,
+                transform->rotZ * MathUtils::DEG_TO_RAD,
+                transform->scaleX, transform->scaleY, transform->scaleZ,
             model
         );
         // Test all triangles

@@ -1,4 +1,7 @@
 #include "Scene.h"
+#include "GameObject.h"
+#include "components/TransformComponent.h"
+#include "components/MeshRendererComponent.h"
 #include "Mesh.h"
 #include "Meshes.h"
 #include <algorithm>
@@ -8,21 +11,19 @@ Scene::Scene() {
 }
 
 Scene::~Scene() {
-    for (auto& inst : instances_) delete inst.mesh;
-    instances_.clear();
+    gameObjects_.clear();
 }
 
-MeshInstance* Scene::getSelectedInstance() {
-    if (selectedIndex_ >= 0 && selectedIndex_ < (int)instances_.size()) {
-        return &instances_[selectedIndex_];
+GameObject* Scene::getSelectedGameObject() {
+    if (selectedIndex_ >= 0 && selectedIndex_ < (int)gameObjects_.size()) {
+        return gameObjects_[selectedIndex_].get();
     }
     return nullptr;
 }
 
 void Scene::deleteSelected() {
-    if (selectedIndex_ >= 0 && selectedIndex_ < (int)instances_.size()) {
-        delete instances_[selectedIndex_].mesh;
-        instances_.erase(instances_.begin() + selectedIndex_);
+    if (selectedIndex_ >= 0 && selectedIndex_ < (int)gameObjects_.size()) {
+        gameObjects_.erase(gameObjects_.begin() + selectedIndex_);
         selectedIndex_ = -1;
     }
 }
@@ -30,8 +31,8 @@ void Scene::deleteSelected() {
 std::string Scene::generateUniqueName(const std::string& baseName) {
     // Check if base name exists
     bool exists = false;
-    for (const auto& inst : instances_) {
-        if (inst.name == baseName) {
+    for (const auto& go : gameObjects_) {
+        if (go->getName() == baseName) {
             exists = true;
             break;
         }
@@ -41,15 +42,15 @@ std::string Scene::generateUniqueName(const std::string& baseName) {
     
     // Find highest number suffix
     int maxNum = 0;
-    for (const auto& inst : instances_) {
+    for (const auto& go : gameObjects_) {
         // Check if name starts with baseName
-        if (inst.name.find(baseName) == 0) {
+        if (go->getName().find(baseName) == 0) {
             // Look for " (#)" pattern
-            size_t parenPos = inst.name.find(" (");
+            size_t parenPos = go->getName().find(" (");
             if (parenPos != std::string::npos) {
-                size_t closePos = inst.name.find(")", parenPos);
+                size_t closePos = go->getName().find(")", parenPos);
                 if (closePos != std::string::npos) {
-                    std::string numStr = inst.name.substr(parenPos + 2, closePos - parenPos - 2);
+                    std::string numStr = go->getName().substr(parenPos + 2, closePos - parenPos - 2);
                     try {
                         int num = std::stoi(numStr);
                         maxNum = std::max(maxNum, num);
@@ -63,34 +64,61 @@ std::string Scene::generateUniqueName(const std::string& baseName) {
 }
 
 void Scene::addPyramid(float size, float x, float y, float z, const std::string& baseName) {
-    MeshInstance inst;
-    inst.mesh = CreatePyramidMesh(size);
-    inst.name = generateUniqueName(baseName);
-    inst.transform.x = x;
-    inst.transform.y = y;
-    inst.transform.z = z;
-    inst.transform.scaleX = inst.transform.scaleY = inst.transform.scaleZ = 1.0f;
-    instances_.push_back(inst);
+    auto go = std::make_unique<GameObject>(generateUniqueName(baseName));
+    
+    // Set transform
+    auto* transform = go->getTransform();
+    transform->x = x;
+    transform->y = y;
+    transform->z = z;
+    
+    // Add mesh renderer
+    auto* renderer = go->addComponent<MeshRendererComponent>();
+    renderer->mesh = CreatePyramidMesh(size);
+    
+    gameObjects_.push_back(std::move(go));
 }
 
 void Scene::addCube(float size, float x, float y, float z, const std::string& baseName) {
-    MeshInstance inst;
-    inst.mesh = CreateCubeMesh(size);
-    inst.name = generateUniqueName(baseName);
-    inst.transform.x = x;
-    inst.transform.y = y;
-    inst.transform.z = z;
-    inst.transform.scaleX = inst.transform.scaleY = inst.transform.scaleZ = 1.0f;
-    instances_.push_back(inst);
+    auto go = std::make_unique<GameObject>(generateUniqueName(baseName));
+    
+    // Set transform
+    auto* transform = go->getTransform();
+    transform->x = x;
+    transform->y = y;
+    transform->z = z;
+    
+    // Add mesh renderer
+    auto* renderer = go->addComponent<MeshRendererComponent>();
+    renderer->mesh = CreateCubeMesh(size);
+    
+    gameObjects_.push_back(std::move(go));
 }
 
 void Scene::addSphere(float diameter, int segments, float x, float y, float z, const std::string& baseName) {
-    MeshInstance inst;
-    inst.mesh = CreateSphereMesh(diameter, segments);
-    inst.name = generateUniqueName(baseName);
-    inst.transform.x = x;
-    inst.transform.y = y;
-    inst.transform.z = z;
-    inst.transform.scaleX = inst.transform.scaleY = inst.transform.scaleZ = 1.0f;
-    instances_.push_back(inst);
+    auto go = std::make_unique<GameObject>(generateUniqueName(baseName));
+    
+    // Set transform
+    auto* transform = go->getTransform();
+    transform->x = x;
+    transform->y = y;
+    transform->z = z;
+    
+    // Add mesh renderer
+    auto* renderer = go->addComponent<MeshRendererComponent>();
+    renderer->mesh = CreateSphereMesh(diameter, segments);
+    
+    gameObjects_.push_back(std::move(go));
+}
+
+GameObject* Scene::addEmptyGameObject(const std::string& baseName, float x, float y, float z) {
+    auto go = std::make_unique<GameObject>(generateUniqueName(baseName));
+    auto* transform = go->getTransform();
+    transform->x = x;
+    transform->y = y;
+    transform->z = z;
+
+    gameObjects_.push_back(std::move(go));
+    selectedIndex_ = static_cast<int>(gameObjects_.size()) - 1;
+    return gameObjects_[selectedIndex_].get();
 }

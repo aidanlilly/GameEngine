@@ -17,6 +17,10 @@ set(SOURCES
     src/main.cpp
     src/Application.cpp
     src/Scene.cpp
+    src/GameObject.cpp
+    src/components/TransformComponent.cpp
+    src/components/MeshRendererComponent.cpp
+    src/components/LightComponent.cpp
     src/Shader.cpp
     src/Mesh.cpp
     src/Camera.cpp

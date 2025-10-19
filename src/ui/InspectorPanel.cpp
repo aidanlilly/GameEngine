@@ -1,6 +1,8 @@
 #include "InspectorPanel.h"
-#include "Mesh.h"
 #include "../Scene.h"
+#include "GameObject.h"
+#include "components/MeshRendererComponent.h"
+#include "Mesh.h"
 #include "imgui.h"
 #include <cstdio>
 #include <cstring>
@@ -16,19 +18,21 @@ void InspectorPanel::render(Scene* scene) {
         return;
     }
     
-    auto& instances = scene->getInstances();
-    ImGui::Text("Objects: %zu", instances.size());
+    auto& gameObjects = scene->getGameObjects();
+    ImGui::Text("Objects: %zu", gameObjects.size());
     ImGui::Separator();
     
     // List instances (clickable to select)
-    for (size_t i = 0; i < instances.size(); ++i) {
+    for (size_t i = 0; i < gameObjects.size(); ++i) {
         ImGui::PushID((int)i);
         
         // Display object name with vertex count
         char label[128];
+        auto* meshRenderer = gameObjects[i]->getComponent<MeshRendererComponent>();
+        unsigned int vertCount = (meshRenderer && meshRenderer->mesh) ? meshRenderer->mesh->getVertexCount() : 0;
         snprintf(label, sizeof(label), "%s (%u verts)", 
-                 instances[i].name.c_str(), 
-                 instances[i].mesh->getVertexCount());
+                 gameObjects[i]->getName().c_str(), 
+                 vertCount);
         
         bool isSelected = (scene->getSelectedIndex() == (int)i);
         if (ImGui::Selectable(label, isSelected)) {
@@ -40,7 +44,7 @@ void InspectorPanel::render(Scene* scene) {
             if (ImGui::MenuItem("Rename")) {
                 renamingIndex_ = (int)i;
                 // Copy current name to buffer
-                strncpy(renameBuffer_, instances[i].name.c_str(), sizeof(renameBuffer_) - 1);
+                strncpy(renameBuffer_, gameObjects[i]->getName().c_str(), sizeof(renameBuffer_) - 1);
                 renameBuffer_[sizeof(renameBuffer_) - 1] = '\0';
             }
             ImGui::EndPopup();
@@ -50,7 +54,7 @@ void InspectorPanel::render(Scene* scene) {
     }
     
     // Rename popup modal
-    if (renamingIndex_ >= 0 && renamingIndex_ < (int)instances.size()) {
+    if (renamingIndex_ >= 0 && renamingIndex_ < (int)gameObjects.size()) {
         ImGui::OpenPopup("Rename Object");
         if (ImGui::BeginPopupModal("Rename Object", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("Enter new name:");
@@ -59,7 +63,7 @@ void InspectorPanel::render(Scene* scene) {
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
             
             if (enterPressed || ImGui::Button("OK")) {
-                instances[renamingIndex_].name = renameBuffer_;
+                gameObjects[renamingIndex_]->setName(renameBuffer_);
                 renamingIndex_ = -1;
                 ImGui::CloseCurrentPopup();
             }
@@ -71,6 +75,15 @@ void InspectorPanel::render(Scene* scene) {
             
             ImGui::EndPopup();
         }
+    }
+    
+    // Right-click on empty space of the Inspector to create a new GameObject
+    // Combine MouseButtonRight to avoid opening on left-click when flags are provided
+    if (ImGui::BeginPopupContextWindow("InspectorContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
+        if (ImGui::MenuItem("Create Empty")) {
+            scene->addEmptyGameObject("GameObject", 0.0f, 0.0f, 0.0f);
+        }
+        ImGui::EndPopup();
     }
     
     ImGui::EndChild();

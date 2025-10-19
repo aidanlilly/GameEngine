@@ -2,33 +2,24 @@
 #define SCENE_H
 
 #include <vector>
-#include <utility>
+#include <memory>
 #include <string>
+
 class Mesh;
-
-struct Transform {
-    float x = 0.0f, y = 0.0f, z = 0.0f;      // position
-    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f; // rotation in degrees (Euler angles)
-    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f; // scale
-};
-
-struct MeshInstance {
-    Mesh* mesh = nullptr;
-    Transform transform;
-    std::string name = "Object";
-};
+class GameObject;
 
 class Scene {
 public:
     Scene();
     ~Scene();
-    std::vector<MeshInstance>& getInstances() { return instances_; }
-    const std::vector<MeshInstance>& getInstances() const { return instances_; }
+    
+    std::vector<std::unique_ptr<GameObject>>& getGameObjects() { return gameObjects_; }
+    const std::vector<std::unique_ptr<GameObject>>& getGameObjects() const { return gameObjects_; }
     
     // Selection
     int getSelectedIndex() const { return selectedIndex_; }
     void setSelectedIndex(int idx) { selectedIndex_ = idx; }
-    MeshInstance* getSelectedInstance();
+    GameObject* getSelectedGameObject();
     void deleteSelected();
     
     // Helpers for clarity
@@ -36,8 +27,11 @@ public:
     void addCube(float size = 1.0f, float x = 0.0f, float y = 0.0f, float z = -2.0f, const std::string& baseName = "Cube");
     void addSphere(float diameter = 1.0f, int segments = 32, float x = 0.0f, float y = 0.0f, float z = -2.0f, const std::string& baseName = "Sphere");
     
+    // Create an empty GameObject at the given position and select it
+    GameObject* addEmptyGameObject(const std::string& baseName = "GameObject", float x = 0.0f, float y = 0.0f, float z = 0.0f);
+    
 private:
-    std::vector<MeshInstance> instances_;
+    std::vector<std::unique_ptr<GameObject>> gameObjects_;
     int selectedIndex_ = -1;
     
     // Generate unique name with numbering if duplicates exist
